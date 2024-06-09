@@ -1,0 +1,58 @@
+- name: Database_playbook
+  hosts: database
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Set variables
+      set_fact:
+        DB_ADDR: "{{ hostvars['database_1'].ansible_host }}"
+        MYSQL_INIT_URL: "https://raw.githubusercontent.com/spring-petclinic/spring-petclinic-rest/master/src/main/resources/db/mysql/initDB.sql"
+        MYSQL_POPULATE_URL: "https://raw.githubusercontent.com/spring-petclinic/spring-petclinic-rest/master/src/main/resources/db/mysql/populateDB.sql"
+        MYSQL_CONFIG_FILE: "/etc/mysql/mysql.conf.d/mysqld.cnf"
+
+    - name: Update apt
+      apt:
+        update_cache: yes
+
+    - name: Install nginx
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Create a dir for DB things
+      file:
+        path: ~/database
+        state: directory
+        mode: 0777
+
+    - name: Download the DB init script
+      get_url:
+        url: "{{ MYSQL_INIT_URL }}"
+        dest: ~/database/initDB.sql
+    
+    - name: Download the DB populate script
+      get_url:
+        url: "{{ MYSQL_POPULATE_URL }}"
+        dest: ~/database/populateDB.sql
+
+    - name: Open the DB on 0.0.0.0
+      command: sed -i "s/127.0.0.1/0.0.0.0/g" {{ MYSQL_CONFIG_FILE }}
+
+    - name: Start mysql
+      systemd:
+        name: mysql
+        state: started
+
+    - name: Copy the DB config script
+      copy:
+        src: db_config.sh
+        dest: ~/database/db_config.sh
+      
+    - name: Change the DB config script's permissions
+      file:
+        path: ~/database/db_config.sh
+        mode: "0777"
+
+    - name: Run the DB config script
+      command: sh ~/database/db_config.sh

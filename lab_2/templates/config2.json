@@ -1,0 +1,676 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "Username"
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "Password1!"
+    },
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "VNet1",
+      "metadata": {
+        "description": "VNet name"
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "defaultValue": "Subnet1",
+      "metadata": {
+        "description": "Subnet Name"
+      }
+    },
+    "frontendNSGName": {
+      "type": "string",
+      "defaultValue": "frontendNSG"
+    },
+    "backendNSGName": {
+      "type": "string",
+      "defaultValue": "backendNSG"
+    },
+    "frontendIPName": {
+      "type": "string",
+      "defaultValue": "[concat('frontendIP', uniqueString(resourceGroup().id))]"
+    },
+    "frontendIFaceName": {
+      "type": "string",
+      "defaultValue": "frontendIFace"
+    },
+    "frontendVMName": {
+      "type": "string",
+      "defaultValue": "frontendVM"
+    },
+    "backendIPName1": {
+      "type": "string",
+      "defaultValue": "[concat('backendIPName1', uniqueString(resourceGroup().id))]"
+    },
+    "backendIFaceName1": {
+      "type": "string",
+      "defaultValue": "backendIFace1"
+    },
+    "backendVMName1": {
+      "type": "string",
+      "defaultValue": "backendVM1"
+    },
+    "backendIPName2": {
+      "type": "string",
+      "defaultValue": "[concat('backendIPName2', uniqueString(resourceGroup().id))]"
+    },
+    "backendIFaceName2": {
+      "type": "string",
+      "defaultValue": "backendIFace2"
+    },
+    "backendVMName2": {
+      "type": "string",
+      "defaultValue": "backendVM2"
+    },
+    "backendIPName3": {
+      "type": "string",
+      "defaultValue": "[concat('backendIPName3', uniqueString(resourceGroup().id))]"
+    },
+    "backendIFaceName3": {
+      "type": "string",
+      "defaultValue": "backendIFace3"
+    },
+    "backendVMName3": {
+      "type": "string",
+      "defaultValue": "backendVM3"
+    },
+    "databaseIPName": {
+      "type": "string",
+      "defaultValue": "[concat('databaseIP', uniqueString(resourceGroup().id))]"
+    },
+    "databaseIFaceName": {
+      "type": "string",
+      "defaultValue": "databaseIFace"
+    },
+    "databaseVMName": {
+      "type": "string",
+      "defaultValue": "databaseVM"
+    },
+    "nginxIPName": {
+      "type": "string",
+      "defaultValue": "[concat('nginxIP', uniqueString(resourceGroup().id))]"
+    },
+    "nginxIFaceName": {
+      "type": "string",
+      "defaultValue": "nginxIFace"
+    },
+    "nginxVMName": {
+      "type": "string",
+      "defaultValue": "nginxVM"
+    }
+  },
+  "variables": {
+    "vnetPrefix": "10.0.0.0/16",
+    "subnetPrefix": "10.0.0.0/24",
+    "location": "[resourceGroup().location]"
+  },
+  "functions": [
+    {
+      "namespace": "local",
+      "members": {
+        "findInterface": {
+          "parameters": [
+            {
+              "name": "interface_param",
+              "type": "string"
+            }
+          ],
+          "output": {
+            "value": "[resourceId('Microsoft.Network/networkInterfaces', parameters('interface_param'))]",
+            "type": "string"
+          }
+        },
+        "findNSG": {
+          "parameters": [
+            {
+              "name": "nsg_param",
+              "type": "string"
+            }
+          ],
+          "output": {
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsg_param'))]",
+            "type": "string"
+          }
+        },
+        "findIP": {
+          "parameters": [
+            {
+              "name": "ip_param",
+              "type": "string"
+            }
+          ],
+          "output": {
+            "value": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('ip_param'))]",
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "resources": [
+    // virtual network
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('vnetName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('vnetPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[local.findNSG(parameters('frontendNSGName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [ "[local.findNSG(parameters('frontendNSGName'))]" ]
+    },
+    // NSGs
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('frontendNSGName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "[concat(parameters('frontendNSGName'), 'In')]",
+            "properties": {
+              "description": "description",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "[concat(parameters('frontendNSGName'), 'Out')]",
+            "properties": {
+              "description": "description",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('backendNSGName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "[concat(parameters('backendNSGName'), 'In')]",
+            "properties": {
+              "description": "description",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[variables('vnetPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    // machine 1 - frontend
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('frontendIPName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('frontendIPName')]"
+      },
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "[toLower(parameters('frontendIPName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('frontendIFaceName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('frontendIFaceName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              },
+              "publicIPAddress": {
+                "id": "[local.findIP(parameters('frontendIPName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('frontendVMName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('frontendVMName')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_B1ms"
+        },
+        "osProfile": {
+          "computerName": "[parameters('frontendVMName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('frontendVMName'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('frontendIFaceName'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('frontendIFaceName'))]"
+      ]
+    },
+    // machine 2 - first_backend
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('backendIFaceName1')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendIFaceName1')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('backendVMName1')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendVMName1')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_B1ms"
+        },
+        "osProfile": {
+          "computerName": "[parameters('backendVMName1')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('backendVMName1'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('backendIFaceName1'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('backendIFaceName1'))]"
+      ]
+    },
+    // machine 3 - second_backend
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('backendIFaceName2')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendIFaceName2')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('backendVMName2')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendVMName2')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_B1ms"
+        },
+        "osProfile": {
+          "computerName": "[parameters('backendVMName2')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('backendVMName2'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('backendIFaceName2'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('backendIFaceName2'))]"
+      ]
+    },
+    // machine 4 - third_backend
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('backendIFaceName3')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendIFaceName3')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('backendVMName3')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('backendVMName3')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_B1ms"
+        },
+        "osProfile": {
+          "computerName": "[parameters('backendVMName3')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('backendVMName3'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('backendIFaceName3'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('backendIFaceName3'))]"
+      ]
+    },
+    // machine 5- database
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('databaseIFaceName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('databaseIFaceName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('databaseVMName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('databaseVMName')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_DS1_v2"
+        },
+        "osProfile": {
+          "computerName": "[parameters('databaseVMName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('databaseVMName'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('databaseIFaceName'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('databaseIFaceName'))]"
+      ]
+    },
+    // machine 6 - nginx 
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "[parameters('nginxIFaceName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('nginxIFaceName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipConfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnetName'),parameters('subnetName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('nginxVMName')]",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "[parameters('nginxVMName')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_DS1_v2"
+        },
+        "osProfile": {
+          "computerName": "[parameters('nginxVMName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('nginxVMName'), '-OSDisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[local.findInterface(parameters('nginxIFaceName'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[local.findInterface(parameters('nginxIFaceName'))]"
+      ]
+    }
+  ]
+}

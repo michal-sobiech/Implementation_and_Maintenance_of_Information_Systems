@@ -1,0 +1,101 @@
+- name: Frontend_playbook
+  hosts: frontend_1
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Create empty file
+      file:
+        path: ~/testowy_plik.txt
+        state: touch
+
+    - name: Set variables
+      set_fact:
+        BE_ADDR: "{{ hostvars['backend_1'].ansible_host }}"
+        BE_PORT: "{{ hostvars['backend_1'].port }}"
+        FE_ADDR: "{{ hostvars['frontend_1'].ansible_host }}"
+        NGINX_CONFIG_FILE: /etc/nginx/sites-available/default
+        APP_SHARED_FILES_DIR: /var/www/app/dist
+
+    - name: Install Node.js with Snap
+      snap:
+        name: node
+        channel: "18/stable"
+        classic: yes
+      when: "'node' not in ansible_play_hosts[0]"
+
+    - name: Clone the git repo
+      git:
+        repo: https://github.com/spring-petclinic/spring-petclinic-angular
+        dest: ~/app/spring-petclinic-angular
+        update: yes
+        force: yes
+
+    - name: Replace the backend IP
+      command: find ~/app/spring-petclinic-angular/src -type f -exec sed -i "s/localhost/{{ FE_ADDR }}/g" {} \;
+      
+    - name: Replace the backend port
+      command: find ~/app/spring-petclinic-angular/src -type f -exec sed -i "s/9966/80/g" {} \;
+
+    - name: Install npm modules
+      # npm:
+      #   path: ~/app/spring-petclinic-angular
+      #   global: no
+      #   state: present
+      command: npm i
+      args:
+        chdir: ~/app/spring-petclinic-angular
+
+    - name: Install Angular
+      npm:
+        name: "@angular/cli"
+        global: yes
+      when: "'@angular/cli' not in ansible_play_hosts[0]"
+
+    - name: Build the app
+      command: "ng build --configuration=production"
+      args:
+        chdir: ~/app/spring-petclinic-angular/
+
+    - name: Make a folder for nginx stuff
+      file:
+        path: "{{ APP_SHARED_FILES_DIR }}"
+        state: directory
+        mode: "0777"
+
+    - name: Copy build output to the nginx folder
+      copy:
+        src: ~/app/spring-petclinic-angular/dist/
+        dest: "{{ APP_SHARED_FILES_DIR }}"
+        remote_src: yes
+
+    - name: Update apt
+      apt:
+        update_cache: yes
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Nginx setup
+      copy:
+        content: |
+          server {
+              listen 80;
+              index index.html;
+              location / {
+                  root {{ APP_SHARED_FILES_DIR }};
+                  try_files $uri $uri/ /index.html;
+              }
+              location /petclinic/api/ {
+                  proxy_pass http://{{ BE_ADDR }}:{{ BE_PORT }};
+                  include proxy_params;
+              }
+          }
+        dest: "{{ NGINX_CONFIG_FILE }}"
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted

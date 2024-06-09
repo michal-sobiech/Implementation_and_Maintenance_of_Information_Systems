@@ -1,0 +1,50 @@
+- name: Backend_playbook_2
+  hosts: 
+    backend_1
+    backend_2
+    backend_3
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Set variables
+      set_fact:
+        BE_PORT: "{{ hostvars[inventory_hostname].port }}"
+        DB_ADDR: "{{ hostvars['database_1'].ansible_host }}"
+        DB_PORT: "{{ hostvars['database_1'].port }}"
+      with_items: "{{ groups['backend'] }}"
+
+    - name: Update apt
+      apt:
+        update_cache: yes
+
+    - name: Install nginx
+      apt:
+        name: openjdk-19-jdk
+        state: present
+
+    - name: Clone the git repo
+      git:
+        repo: https://github.com/spring-petclinic/spring-petclinic-rest
+        dest: ~/app/spring-petclinic-rest
+        update: yes
+        force: yes
+      
+    - name: Change the DB type to mysql
+      command: find ./src -type f -name 'application.properties' -exec sed -i 's/hsqldb/mysql/g' '{}' \;
+      args:
+        chdir: ~/app/spring-petclinic-rest
+
+    - name: Change the BE port
+      command: find ./src -type f -name 'application.properties' -exec sed -i "s/9966/{{ BE_PORT }}/" '{}' \;
+      args:
+        chdir: ~/app/spring-petclinic-rest
+
+    - name: Replace the DB address
+      command: sed -i "s/localhost:3306/{{ DB_ADDR }}:{{ DB_PORT }}/" src/main/resources/application-mysql.properties
+      args:
+        chdir: ~/app/spring-petclinic-rest
+
+    - name: Run the app
+      shell: cd ~/app/spring-petclinic-rest; nohup ./mvnw spring-boot:run </dev/null >/dev/null 2>&1 &
+      

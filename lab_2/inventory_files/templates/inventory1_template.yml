@@ -1,0 +1,27 @@
+all:
+  children:
+    frontend_config_1:
+      hosts:
+        frontend_1:
+          ansible_user: Username
+          ansible_ssh_private_key_file: PRIVATE_KEY_FULL_PATH
+          ansible_host: FRONTEND_HOST_IP
+          vm_name: frontend
+
+    backend_config_1:
+      hosts:
+        backend_1:
+          ansible_user: Username
+          ansible_ssh_private_key_file: PRIVATE_KEY_FULL_PATH
+          ansible_host: BACKEND_HOST_IP
+          vm_name: backend
+          port: BACKEND_PORT
+
+    database:
+      hosts:
+        database_1:
+          ansible_user: Username
+          ansible_ssh_private_key_file: PRIVATE_KEY_FULL_PATH
+          ansible_host: DATABASE_HOST_IP
+          vm_name: database
+          port: DATABASE_PORT
